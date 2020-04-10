@@ -1,0 +1,783 @@
+---
+title: "Create Final Data Set Indirect Effects Aim 1"
+author: "Ryan Malosh"
+date: "June 6, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1")
+data <- readRDS("Data/AnalysisData.RDS")      
+      
+```
+Objective: To estimate the indirect effect of influenza vaccine over 8 seasons
+
+Analysis database will contain the variables as described in "C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/Data/Aim 1 Data Dictionary.xlsx"
+
+## Methods
+
+We used longitudinal data from the Household Influenza Vaccine Evaluation (HIVE) study collected from 2010-2011 through 2017-2018 influenza seasons.  
+
+First we will make sure seasonal databases have expected number of individuals and households
+```{r }
+setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/")
+
+ggsave("R Output/Flu count by season.png", width = 9, height = 6, units="in")
+ggplot(data, aes(flu.count)) +
+  geom_histogram(binwidth = 1) + 
+  facet_grid(.~season) +
+  labs(y="Individuals", x="Seasonal count of influenza cases")
+
+data.1011 <- data %>%
+  filter(season=="2010-2011")
+hh.1011 <- data.1011 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+  
+data.1112 <- data %>%
+  filter(season=="2011-2012")
+hh.1112 <- data.1112 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+
+data.1213 <- data %>%
+  filter(season=="2012-2013")
+hh.1213 <- data.1213 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+
+data.1314 <- data %>%
+  filter(season=="2013-2014")
+hh.1314 <- data.1314 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+
+data.1415 <- data %>%
+  filter(season=="2014-2015")
+hh.1415 <- data.1415 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+
+data.1516 <- data %>%
+  filter(season=="2015-2016")
+hh.1516 <- data.1516 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+
+data.1617 <- data %>%
+  filter(season=="2016-2017")
+hh.1617 <- data.1617 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+table(hh.1617$nmem)
+
+data.1718 <- data %>%
+  filter(season=="2017-2018")
+hh.1718 <- data.1718 %>%
+  group_by(master_house_id) %>%
+  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
+table(hh.1718$nmem)
+```
+
+_Individual demographics_
+```{r Table1}
+# Baseline demographics
+ind.data <- data %>%
+  group_by(master_id) %>%
+  filter(row_number()==1) %>%
+  select(master_id, master_house_id, season, agecat, sex, race, highrisk, covprop.cat)
+
+table(ind.data$covprop.cat)
+
+table(ind.data$agecat)
+table(ind.data$sex)
+table(ind.data$race)
+table(ind.data$highrisk)
+table(ind.data$sex, ind.data$agecat)
+table(ind.data$race, ind.data$agecat)
+table(ind.data$highrisk, ind.data$agecat)
+
+# Person Time
+table(data$covprop.cat)
+
+table(data$agecat, data$covprop.cat)
+table(data$sex, data$covprop.cat)
+table(data$race, data$covprop.cat)
+table(data$highrisk, data$covprop.cat)
+
+table(data$sex, data$agecat)
+table(data$race, data$agecat)
+table(data$highrisk, data$agecat)
+```
+
+_Household Vaccine Coverage_
+Examine total vaccine coverage by season.
+```{r Fig1}
+
+# Person time for each vaccine category
+table(data$vax, data$covprop.cat)
+
+hh.data <- data %>%
+  distinct(master_house_id, season, covprop, covprop.cat, HHsize, child.covprop, prek.covprop, k12.covprop) %>%
+  select(master_house_id, season, covprop, covprop.cat, HHsize, child.covprop, prek.covprop, k12.covprop)
+
+hh.data.only <- hh.data %>%
+  group_by(master_house_id) %>%
+  summarise(fol.up = length(season)) %>%
+  distinct(master_house_id, fol.up)
+
+hh.data$HHsize[hh.data$HHsize==">= 6"] <- "6+"
+hh.data$HHsize <- as.factor(hh.data$HHsize)
+class(hh.data$HHsize)
+hh.data$HHsize <- factor(hh.data$HHsize, levels = c("6+","5","4","3"))
+
+hh.cov.seas <- table(hh.data$covprop.cat, hh.data$season)
+
+setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/")
+
+ggsave("R Output/VaxCovSeasSize.png", width = 9, height = 6, units="in")
+ggplot(hh.data, aes(covprop, fill=HHsize)) +
+  geom_histogram(binwidth = .25) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  xlab("Proportion of household vaccinated") +
+  ylab("Number of households") +
+  facet_grid(.~season)
+
+childcov.hist <- ggplot(hh.data, aes(child.covprop, fill=HHsize)) +
+  geom_histogram(binwidth = .25) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  xlab("Proportion of household vaccinated") +
+  ylab("Number of households") +
+  facet_grid(.~season)
+
+prekcov.hist <- ggplot(hh.data, aes(prek.covprop, fill=HHsize)) +
+  geom_histogram(binwidth = .25) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  xlab("Proportion of household vaccinated") +
+  ylab("Number of households") +
+  facet_grid(.~season)
+
+k12cov.hist <- ggplot(hh.data, aes(k12.covprop, fill=HHsize)) +
+  geom_histogram(binwidth = .25) +
+  scale_fill_viridis_d() +
+  theme_bw() +
+  xlab("Proportion of household vaccinated") +
+  ylab("Number of households") +
+  facet_grid(.~season)
+
+library(cowplot)
+setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/")
+ggsave("R Output/OthCovSeasSize.png", width = 9, height = 9, units="in")
+plot_grid(childcov.hist, prekcov.hist, k12cov.hist, labels = c('A', 'B', 'C'), ncol=1, label_size = 12)
+```
+
+_Incidence of influenza_
+Estimate the crude incidence rate of influenza by household vaccine coverage each season overall and by type/subtype
+
+```{r inc}
+library(epitools)
+
+table(data$flu.count, data$covprop.cat)
+table(data$flu.count[data$vax==0], data$covprop.cat[data$vax==0])
+
+ir.unvax <- pois.exact(164, pt=1636)
+ir.low <- pois.exact(114, pt=1430)
+ir.mod <- pois.exact(100, pt=1495)
+ir.full <- pois.exact(379, pt=4804)
+ir.all <- bind_rows(ir.unvax, ir.low, ir.mod, ir.full)
+ir.all$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all
+
+ir.low.unvax <- pois.exact(88, pt=958)
+ir.low.unvax
+ir.mod.unvax <- pois.exact(25, pt=386)
+ir.mod.unvax
+# Incidence rate by coverage 2010-2011
+table(data.1011$flu.count, data.1011$covprop.cat)
+
+ir.unvax.1011 <- pois.exact(35, pt=311)
+ir.low.1011 <- pois.exact(21, pt=203)
+ir.mod.1011 <- pois.exact(22, pt=261)
+ir.full.1011 <- pois.exact(52, pt=666)
+ir.all.1011 <- bind_rows(ir.unvax.1011, ir.low.1011, ir.mod.1011, ir.full.1011)
+ir.all.1011$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1011$season <- "2010-2011"
+ir.all.1011
+
+# Incidence rate by coverage 2011-2012
+table(data.1112$flu.count, data.1112$covprop.cat)
+
+ir.unvax.1112 <- pois.exact(2, pt=196)
+ir.low.1112 <- pois.exact(4, pt=163)
+ir.mod.1112 <- pois.exact(7, pt=149)
+ir.full.1112 <- pois.exact(17, pt=435)
+ir.all.1112 <- bind_rows(ir.unvax.1112, ir.low.1112, ir.mod.1112, ir.full.1112)
+ir.all.1112$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1112$season <- "2011-2012"
+ir.all.1112
+
+# Incidence rate by coverage 2012-2013
+table(data.1213$flu.count, data.1213$covprop.cat)
+
+ir.unvax.1213 <- pois.exact(32, pt=283)
+ir.low.1213 <- pois.exact(14, pt=233)
+ir.mod.1213 <- pois.exact(12, pt=201)
+ir.full.1213 <- pois.exact(59, pt=719)
+ir.all.1213 <- bind_rows(ir.unvax.1213, ir.low.1213, ir.mod.1213, ir.full.1213)
+ir.all.1213$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1213$season <- "2012-2013"
+ir.all.1213
+
+# Incidence rate by coverage 2013-2014
+table(data.1314$flu.count, data.1314$covprop.cat)
+
+ir.unvax.1314 <- pois.exact(27, pt=213)
+ir.low.1314 <- pois.exact(9, pt=128)
+ir.mod.1314 <- pois.exact(3, pt=127)
+ir.full.1314 <- pois.exact(13, pt=581)
+ir.all.1314 <- bind_rows(ir.unvax.1314, ir.low.1314, ir.mod.1314, ir.full.1314)
+ir.all.1314$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1314$season <- "2013-2014"
+ir.all.1314
+
+# Incidence rate by coverage 2014-2015
+table(data.1415$flu.count, data.1415$covprop.cat)
+
+ir.unvax.1415 <- pois.exact(32, pt=215)
+ir.low.1415 <- pois.exact(42, pt=243)
+ir.mod.1415 <- pois.exact(18, pt=228)
+ir.full.1415 <- pois.exact(118, pt=745)
+ir.all.1415 <- bind_rows(ir.unvax.1415, ir.low.1415, ir.mod.1415, ir.full.1415)
+ir.all.1415$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1415$season <- "2014-2015"
+ir.all.1415
+
+# Incidence rate by coverage 2015-2016
+table(data.1516$flu.count, data.1516$covprop.cat)
+
+ir.unvax.1516 <- pois.exact(8, pt=149)
+ir.low.1516 <- pois.exact(1, pt=179)
+ir.mod.1516 <- pois.exact(6, pt=145)
+ir.full.1516 <- pois.exact(24, pt=523)
+ir.all.1516 <- bind_rows(ir.unvax.1516, ir.low.1516, ir.mod.1516, ir.full.1516)
+ir.all.1516$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1516$season <- "2015-2016"
+ir.all.1516
+
+# Incidence rate by coverage 2016-2017
+table(data.1617$flu.count, data.1617$covprop.cat)
+
+ir.unvax.1617 <- pois.exact(14, pt=127)
+ir.low.1617 <- pois.exact(16, pt=157)
+ir.mod.1617 <- pois.exact(19, pt=180)
+ir.full.1617 <- pois.exact(30, pt=426)
+ir.all.1617 <- bind_rows(ir.unvax.1617, ir.low.1617, ir.mod.1617, ir.full.1617)
+ir.all.1617$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1617$season <- "2016-2017"
+ir.all.1617
+
+# Incidence rate by coverage 2017-2018
+table(data.1718$flu.count, data.1718$covprop.cat)
+
+ir.unvax.1718 <- pois.exact(14, pt=142)
+ir.low.1718 <- pois.exact(7, pt=134)
+ir.mod.1718 <- pois.exact(13, pt=204)
+ir.full.1718 <- pois.exact(66, pt=709)
+ir.all.1718 <- bind_rows(ir.unvax.1718, ir.low.1718, ir.mod.1718, ir.full.1718)
+ir.all.1718$covprop.cat <- as.factor(c("0","1","2","3"))
+ir.all.1718$season <- "2017-2018"
+ir.all.1718
+
+ir.all.1018 <- bind_rows(ir.all.1011, ir.all.1112, ir.all.1213, ir.all.1314, ir.all.1415, ir.all.1516, ir.all.1617, ir.all.1718)
+
+setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/")
+ggsave("R Output/IncRateVaxCov.png", width = 9, height = 6, units="in")
+ggplot(ir.all.1018, aes(as.factor(covprop.cat), rate, group=season, colour=season)) +
+  geom_point(size=3) +
+  geom_path() +
+  geom_pointrange(aes(ymin=lower, ymax=upper), alpha=.5) +
+  scale_x_discrete(labels=c("0", "0.01-0.5", "0.5-0.99", "1")) +
+  facet_grid(.~season) +
+  theme_bw() +
+  theme(legend.position = "none", axis.text.x = element_text(angle = 45, hjust=1)) +
+  xlab("Proportion of Household Vaccinated") +
+  ylab("Incidence Rate (person-season)")
+
+
+x <- c(164,88,25)
+y <- c(1636,958,386)
+ir.ind <- matrix(c(x,y), ncol=2)
+rateratio.wald(ir.ind, conf.level = .95)
+
+```
+_Indirect Effects_
+Estimate the indirect effect of vaccination by comparing the incidence rate of influenza among **unvaccinated** members of unvaccinated households to **unvaccinated** members of low and high coverage households adjusting for age category, sex, and high risk condition
+
+```{r model}
+library(lme4)
+library(boot)
+library(glmmTMB)
+
+table(data$vax)
+
+mod0 <- glm(flu.count ~ as.factor(covprop.cat), data=subset(data, vax==0), family=poisson)
+summary(mod0)
+1-exp(mod0$coefficients)
+1-exp(confint(mod0))
+
+# Unadjusted mixed effects with random intercept for individual, household, and season
+mod1 <- glmer(flu.count ~ as.factor(covprop.cat) + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), family=poisson, control=glmerControl(optimizer="Nelder_Mead"))
+
+summary(mod1)
+1-exp(fixef(mod1))
+
+# Adjusted for age group, sex, random effects for individual, household, and season
+mod2a <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+
+summary(mod2a)
+1-exp(fixef(mod2a))
+
+mod2b <- glmer(flu.count ~ as.factor(covprop.cat) + sex + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+
+summary(mod2b)
+1-exp(fixef(mod2b))
+
+mod2 <- glmer(flu.count ~ as.factor(covprop.cat)  + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+
+summary(mod2)
+
+cis.mod2 <- confint.merMod(mod2, method = "Wald")
+cis.mod2
+mod2.tbl <- tibble(est=100*(1-exp(c(fixef(mod2)[2], fixef(mod2)[3]))),
+                   low.ci=100*(1-exp(c(cis.mod2[5,2], cis.mod2[6,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod2[5,1], cis.mod2[6,1])))
+                   )
+mod2.tbl
+
+# Model season as a random effect
+mod3 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), family="poisson", glmerControl(optimizer = "Nelder_Mead"))
+
+mod3.nb <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id), data=subset(data, vax==0), family="nbinom2")
+
+# These models do not converge, try ZIP
+
+# Zero-inflated poisson
+mod4 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), ziformula = ~1, family = "poisson")
+
+summary(mod4)
+cis.mod4 <- confint(mod4, method="Wald")
+cis.mod4
+
+mod4.tbl <- tibble(est=100*(1-exp(c(cis.mod4[2,3], cis.mod4[3,3]))),
+                   low.ci=100*(1-exp(c(cis.mod4[2,2], cis.mod4[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod4[2,1], cis.mod4[3,1])))
+                   )
+mod4.tbl
+```
+Comparing the AIC for the standard poisson and zero-inflated poisson models, the AIC is lower for the standard poisson. Report the results of this model
+
+
+```{r season}
+#2010-2011
+mod.1011 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1011, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1011)
+exp(fixef(mod.1011))
+
+ci.mod1011 <- confint.merMod(mod.1011, method = "profile")
+ci.mod1011[3,1]
+
+mod1011.tbl <- tibble(est=1-exp(fixef(mod.1011)[2:3]),
+                   low=1-exp(c(ci.mod1011[3,2],ci.mod1011[4,2])),
+                   hi=1-exp(c(ci.mod1011[3,1],ci.mod1011[4,1])))
+mod1011.tbl
+
+#2011-2012
+mod.1112 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1112, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1112)
+exp(fixef(mod.1112))
+
+ci.mod1112 <- confint.merMod(mod.1112, method = "profile")
+ci.mod1112[3,1]
+
+mod1112.tbl <- tibble(est=1-exp(fixef(mod.1112)[2:3]),
+                   low=1-exp(c(ci.mod1112[3,2],ci.mod1112[4,2])),
+                   hi=1-exp(c(ci.mod1112[3,1],ci.mod1112[4,1])))
+mod1112.tbl
+
+#2012-2013
+mod.1213 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1213, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1213)
+exp(fixef(mod.1213))
+
+ci.mod1213 <- confint.merMod(mod.1213, method = "profile")
+ci.mod1213[3,1]
+
+mod1213.tbl <- tibble(est=1-exp(fixef(mod.1213)[2:3]),
+                   low=1-exp(c(ci.mod1213[3,2],ci.mod1213[4,2])),
+                   hi=1-exp(c(ci.mod1213[3,1],ci.mod1213[4,1])))
+mod1213.tbl
+
+#2013-2014
+mod.1314 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1314, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1314)
+exp(fixef(mod.1314))
+
+ci.mod1314 <- confint.merMod(mod.1314, method = "profile")
+ci.mod1314[3,1]
+
+mod1314.tbl <- tibble(est=1-exp(fixef(mod.1314)[2:3]),
+                   low=1-exp(c(ci.mod1314[3,2],ci.mod1314[4,2])),
+                   hi=1-exp(c(ci.mod1314[3,1],ci.mod1314[4,1])))
+mod1314.tbl
+
+#2014-2015
+mod.1415 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1415, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1415)
+exp(fixef(mod.1415))
+
+ci.mod1415 <- confint.merMod(mod.1415, method = "profile")
+ci.mod1415[3,1]
+
+mod1415.tbl <- tibble(est=1-exp(fixef(mod.1415)[2:3]),
+                   low=1-exp(c(ci.mod1415[3,2],ci.mod1415[4,2])),
+                   hi=1-exp(c(ci.mod1415[3,1],ci.mod1415[4,1])))
+mod1415.tbl
+
+#2015-2016
+mod.1516 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1516, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1516)
+exp(fixef(mod.1516))
+
+ci.mod1516 <- confint.merMod(mod.1516, method = "profile")
+ci.mod1516[3,1]
+
+mod1516.tbl <- tibble(est=1-exp(fixef(mod.1516)[2:3]),
+                   low=1-exp(c(ci.mod1516[3,2],ci.mod1516[4,2])),
+                   hi=1-exp(c(ci.mod1516[3,1],ci.mod1516[4,1])))
+mod1516.tbl
+
+#2016-2017
+mod.1617 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1617, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1617)
+exp(fixef(mod.1617))
+
+ci.mod1617 <- confint.merMod(mod.1617, method = "profile")
+ci.mod1617[3,1]
+
+mod1617.tbl <- tibble(est=1-exp(fixef(mod.1617)[2:3]),
+                   low=1-exp(c(ci.mod1617[3,2],ci.mod1617[4,2])),
+                   hi=1-exp(c(ci.mod1617[3,1],ci.mod1617[4,1])))
+mod1617.tbl
+
+
+#2017-2018
+mod.1718 <- glmer(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + (1|master_house_id), data=subset(data.1718, vax==0), family=poisson, control=glmerControl(optimizer="bobyqa"))
+summary(mod.1718)
+exp(fixef(mod.1718))
+
+ci.mod1718 <- confint.merMod(mod.1718, method = "Wald")
+ci.mod1718[3,1]
+
+mod1718.tbl <- tibble(est=1-exp(fixef(mod.1718)[2:3]),
+                   low=1-exp(c(ci.mod1718[3,2],ci.mod1718[4,2])),
+                   hi=1-exp(c(ci.mod1718[3,1],ci.mod1718[4,1])))
+mod1718.tbl
+
+mod1018.tbl <- bind_rows(mod1011.tbl, mod1112.tbl, mod1213.tbl, mod1314.tbl, mod1415.tbl, mod1516.tbl, mod1617.tbl, mod1718.tbl)
+
+mod1018.tbl
+
+```
+
+```{r indeff.type}
+# H3N2
+mod.h3 <- glmmTMB(h3.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex  + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), ziformula = ~1, family = "poisson")
+
+summary(mod.h3)
+cis.modh3 <- confint(mod.h3)
+
+modh3.tbl <- tibble(est=100*(1-exp(c(cis.modh3[2,3], cis.modh3[3,3]))),
+                   low.ci=100*(1-exp(c(cis.modh3[2,2], cis.modh3[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.modh3[2,1], cis.modh3[3,1])))
+                   )
+modh3.tbl
+
+# H1N1
+mod.h1 <- glmmTMB(h1.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex  + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), ziformula = ~1, family = "poisson")
+
+summary(mod.h1)
+cis.modh1 <- confint(mod.h1)
+
+modh1.tbl <- tibble(est=100*(1-exp(c(cis.modh1[2,3], cis.modh1[3,3]))),
+                   low.ci=100*(1-exp(c(cis.modh1[2,2], cis.modh1[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.modh1[2,1], cis.modh1[3,1])))
+                   )
+modh1.tbl
+
+mod.b <- glmmTMB(b.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex  + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), ziformula = ~1, family = "poisson")
+
+# Flu B
+summary(mod.b)
+cis.modb <- confint(mod.b)
+
+modb.tbl <- tibble(est=100*(1-exp(c(cis.modb[2,3], cis.modb[3,3]))),
+                   low.ci=100*(1-exp(c(cis.modb[2,2], cis.modb[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.modb[2,1], cis.modb[3,1])))
+                   )
+modb.tbl
+
+```
+
+```{r age}
+# Age-stratified
+
+mod5 <- glmer(flu.count ~ as.factor(covprop.cat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0 & agecat=="<5"), family = "poisson")
+
+cis.mod5 <- confint(mod5, method="Wald")
+cis.mod5
+
+mod5.tbl <- tibble(est=100*(1-exp(c(fixef(mod5)[2:3]))),
+                   low.ci=100*(1-exp(c(cis.mod5[5,2], cis.mod5[6,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod5[5,1], cis.mod5[6,1])))
+                   )
+mod5.tbl
+
+mod6 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + sex  + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0 & agecat=="5-17"), ziformula = ~1, family = "poisson")
+
+cis.mod6 <- confint(mod6)
+cis.mod6
+
+mod6.tbl <- tibble(est=100*(1-exp(c(cis.mod6[2,3], cis.mod6[3,3]))),
+                   low.ci=100*(1-exp(c(cis.mod6[2,2], cis.mod6[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod6[2,1], cis.mod6[3,1])))
+                   )
+mod6.tbl
+
+mod7 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + sex  + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0 & agecat=="18+"), ziformula = ~1, family = "poisson")
+
+cis.mod7 <- confint(mod7)
+cis.mod7
+
+mod7.tbl <- tibble(est=100*(1-exp(c(cis.mod7[2,3], cis.mod7[3,3]))),
+                   low.ci=100*(1-exp(c(cis.mod7[2,2], cis.mod7[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod7[2,1], cis.mod7[3,1])))
+                   )
+mod7.tbl
+```
+
+_Use proportion of children vaccinated as predictor_
+
+```{r child}
+mod8 <- glmmTMB(flu.count ~ as.factor(child.covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0), ziformula = ~1, family = "poisson")
+
+summary(mod8)
+cis.mod8 <- confint(mod8, method="Wald")
+
+mod8.tbl <- tibble(est=100*(1-exp(c(cis.mod8[2,3], cis.mod8[3,3]))),
+                   low.ci=100*(1-exp(c(cis.mod8[2,2], cis.mod8[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod8[2,1], cis.mod8[3,1])))
+                   )
+mod8.tbl
+
+```
+```{r prek}
+mod9 <- glmmTMB(flu.count ~ as.factor(prek.covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0 & HHprek>=1), ziformula = ~1, family = "poisson")
+
+summary(mod9)
+cis.mod9 <- confint(mod9, method="Wald")
+
+mod9.tbl <- tibble(est=100*(1-exp(c(cis.mod9[2,3], cis.mod9[3,3]))),
+                   low.ci=100*(1-exp(c(cis.mod9[2,2], cis.mod9[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod9[2,1], cis.mod9[3,1])))
+                   )
+mod9.tbl
+
+```
+```{r k12}
+mod10 <- glmmTMB(flu.count ~ as.factor(k12.covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), data=subset(data, vax==0 & HHk12>=1), ziformula = ~1, family = "poisson")
+
+summary(mod10)
+cis.mod10 <- confint(mod10, method="Wald")
+
+mod10.tbl <- tibble(est=100*(1-exp(c(cis.mod10[2,3], cis.mod10[3,3]))),
+                   low.ci=100*(1-exp(c(cis.mod10[2,2], cis.mod10[3,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod10[2,1], cis.mod10[3,1])))
+                   )
+mod10.tbl
+
+```
+_Total Effects_
+Estimate the total effect of vaccination by comparing the incidence rate of influenza among **unvaccinated members** of low and high vaccine coverage households to **vaccinated** members of low and high vaccine coverage households adjusting for age category, sex, and high risk condition
+```{r total}
+table(data$flu.count[data$vax==1], data$covprop.cat[data$vax==1])
+table(data$flu.count[data$vax==0], data$covprop.cat[data$vax==0])
+
+ir.vax <- pois.exact(379, pt=4804)
+ir.vax
+
+ir.mod.vax <- pois.exact(75, pt=1109)
+ir.mod.vax
+
+ir.low.vax <- pois.exact(26, pt=472)
+ir.low.vax
+
+cases <- c(379,75,26, 164) 
+pt <- c(4804, 1109, 472, 1636)
+ir.tot <- matrix(c(cases, pt), ncol=2)
+
+rateratio(ir.tot, method="wald", rev="r")
+
+```
+
+```{r tot.mod}
+tot.effect <- data %>%
+  mutate(tot.effect = ifelse(vax==0 & covprop==0, 1,
+                             ifelse(vax==1 & covprop>0, 1, 0)))
+table(tot.effect$tot.effect)
+
+# Simple poisson to see if we can recover estimates from crude incidence rate ratio
+mod11 <- glm(flu.count ~ as.factor(covprop.cat), family="poisson", data=subset(tot.effect, tot.effect==1))
+summary(mod11)
+1-exp(coef(mod11))
+
+# Unadjusted model with random effects
+mod12 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + (1|master_id) + (1|master_house_id) + (1|season), family="poisson", ziformula = ~1, data=subset(tot.effect, tot.effect==1)) 
+summary(mod12)
+
+cis.mod12 <- confint(mod12, method="Wald")
+cis.mod12
+
+mod12.tbl <- tibble(est=100*(1-exp(c(cis.mod12[2,3], cis.mod12[3,3], cis.mod12[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod12[2,2], cis.mod12[3,2], cis.mod12[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod12[2,1], cis.mod12[3,1], cis.mod12[4,1])))
+                   )
+mod12.tbl
+
+
+# Adjusted ZIP model with random effects
+mod13 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk + (1|master_id) + (1|master_house_id) + (1|season), family="poisson", ziformula = ~1, data=subset(tot.effect, tot.effect==1)) 
+summary(mod13)
+
+cis.mod13 <- confint(mod13, method="Wald")
+cis.mod13
+
+mod13.tbl <- tibble(est=100*(1-exp(c(cis.mod13[2,3], cis.mod13[3,3], cis.mod13[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod13[2,2], cis.mod13[3,2], cis.mod13[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod13[2,1], cis.mod13[3,1], cis.mod13[4,1])))
+                   )
+mod13.tbl
+```
+
+```{r tot.seas}
+mod.tot1011 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="poisson", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2010-2011")) 
+summary(mod.tot1011)
+
+cis.mod.tot1011 <- confint(mod.tot1011, method="Wald")
+modtot1011.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1011[2,3], cis.mod.tot1011[3,3], cis.mod.tot1011[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1011[2,2], cis.mod.tot1011[3,2], cis.mod.tot1011[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1011[2,1], cis.mod.tot1011[3,1], cis.mod.tot1011[4,1])))
+                   )
+modtot1011.tbl
+
+# 2011-2012
+mod.tot1112 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + (1|master_house_id), family="nbinom2", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2011-2012")) 
+summary(mod.tot1112)
+
+cis.mod.tot1112 <- confint(mod.tot1112, method="Wald")
+modtot1112.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1112[2,3], cis.mod.tot1112[3,3], cis.mod.tot1112[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1112[2,2], cis.mod.tot1112[3,2], cis.mod.tot1112[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1112[2,1], cis.mod.tot1112[3,1], cis.mod.tot1112[4,1])))
+                   )
+modtot1112.tbl
+
+# 2012-2013
+mod.tot1213 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="nbinom2", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2012-2013")) 
+summary(mod.tot1213) 
+
+cis.mod.tot1213 <- confint(mod.tot1213, method="Wald")
+modtot1213.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1213[2,3], cis.mod.tot1213[3,3], cis.mod.tot1213[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1213[2,2], cis.mod.tot1213[3,2], cis.mod.tot1213[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1213[2,1], cis.mod.tot1213[3,1], cis.mod.tot1213[4,1])))
+                   )
+modtot1213.tbl
+
+#2013-2014
+mod.tot1314 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="nbinom2", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2013-2014")) 
+summary(mod.tot1314) 
+
+cis.mod.tot1314 <- confint(mod.tot1314, method="Wald")
+modtot1314.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1314[2,3], cis.mod.tot1314[3,3], cis.mod.tot1314[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1314[2,2], cis.mod.tot1314[3,2], cis.mod.tot1314[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1314[2,1], cis.mod.tot1314[3,1], cis.mod.tot1314[4,1])))
+                   )
+modtot1314.tbl
+
+#2014-2015
+mod.tot1415 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="nbinom2", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2014-2015")) 
+summary(mod.tot1415) 
+
+cis.mod.tot1415 <- confint(mod.tot1415, method="Wald")
+modtot1415.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1415[2,3], cis.mod.tot1415[3,3], cis.mod.tot1415[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1415[2,2], cis.mod.tot1415[3,2], cis.mod.tot1415[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1415[2,1], cis.mod.tot1415[3,1], cis.mod.tot1415[4,1])))
+                   )
+modtot1415.tbl
+
+#2015-2016
+mod.tot1516 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="nbinom2", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2015-2016")) 
+summary(mod.tot1516) 
+
+cis.mod.tot1516 <- confint(mod.tot1516, method="Wald")
+cis.mod.tot1516
+modtot1516.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1516[2,3], cis.mod.tot1516[3,3], cis.mod.tot1516[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1516[2,2], cis.mod.tot1516[3,2], cis.mod.tot1516[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1516[2,1], cis.mod.tot1516[3,1], cis.mod.tot1516[4,1])))
+                   )
+modtot1516.tbl
+
+#2016-2017
+mod.tot1617 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="nbinom2", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2016-2017")) 
+summary(mod.tot1617) 
+
+cis.mod.tot1617 <- confint(mod.tot1617, method="Wald")
+modtot1617.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1617[2,3], cis.mod.tot1617[3,3], cis.mod.tot1617[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1617[2,2], cis.mod.tot1617[3,2], cis.mod.tot1617[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1617[2,1], cis.mod.tot1617[3,1], cis.mod.tot1617[4,1])))
+                   )
+modtot1617.tbl
+
+#2017-2018
+mod.tot1718 <- glmmTMB(flu.count ~ as.factor(covprop.cat) + as.factor(agecat) + sex + highrisk +  (1|master_house_id), family="poisson", ziformula = ~1, data=subset(tot.effect, tot.effect==1 & season=="2017-2018")) 
+summary(mod.tot1718) 
+
+cis.mod.tot1718 <- confint(mod.tot1718, method="Wald")
+modtot1718.tbl <- tibble(est=100*(1-exp(c(cis.mod.tot1718[2,3], cis.mod.tot1718[3,3], cis.mod.tot1718[4,3]))),
+                   low.ci=100*(1-exp(c(cis.mod.tot1718[2,2], cis.mod.tot1718[3,2], cis.mod.tot1718[4,2]))),
+                   hi.ci=100*(1-exp(c(cis.mod.tot1718[2,1], cis.mod.tot1718[3,1], cis.mod.tot1718[4,1])))
+                   )
+modtot1718.tbl
+
+```
+
+```{r ve.seas}
+setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1")
+ve.est <- read.csv("Data/VE Estimates 2010-2018.csv")
+
+ve.est$vax.cov <- factor(ve.est$vax.cov, levels = c("Low", "Moderate", "Full"))
+ggplot(ve.est, aes(ve.type, ve.est, colour=vax.cov)) +
+  geom_point(position = position_dodge(width = 0.5), na.rm=T) +
+  geom_pointrange(aes(ymin = ve.lo, ymax = ve.hi), position=position_dodge(width = 0.5), na.rm=T) +
+  facet_grid(. ~ study.year) +
+  theme_bw() +
+  scale_color_grey("Household\nVaccine Coverage", end = .66) +
+  coord_cartesian(ylim = c(-100,100)) +
+  labs(y="Vaccine Effectiveness") +
+  geom_hline(aes(yintercept=0), colour="black", linetype="dashed")
+ggsave("R Output/VE by Vax Cov 2010-18.png", width = 15, height = 6, units="in")
+```
