@@ -1,5 +1,5 @@
 ---
-title: "Create Final Data Set Indirect Effects Aim 1"
+title: "Indirect, Direct, and Total Effects of Influenza Vaccine in the HIVE Study"
 author: "Ryan Malosh"
 date: "June 6, 2019"
 output: html_document
@@ -10,77 +10,20 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 
 setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1")
-data <- readRDS("Data/AnalysisData.RDS")      
+data <- readRDS("")      
       
 ```
-Objective: To estimate the indirect effect of influenza vaccine over 8 seasons
 
-Analysis database will contain the variables as described in "C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/Data/Aim 1 Data Dictionary.xlsx"
+## Study Objective
+
+To estimate the indirect, direct, and total effects of influenza vaccine over 8 seasons in households with children
 
 ## Methods
 
 We used longitudinal data from the Household Influenza Vaccine Evaluation (HIVE) study collected from 2010-2011 through 2017-2018 influenza seasons.  
 
 First we will make sure seasonal databases have expected number of individuals and households
-```{r }
-setwd("C:/Users/rmalosh/Box Sync/Indirect Effects R03/Aim 1/")
 
-ggsave("R Output/Flu count by season.png", width = 9, height = 6, units="in")
-ggplot(data, aes(flu.count)) +
-  geom_histogram(binwidth = 1) + 
-  facet_grid(.~season) +
-  labs(y="Individuals", x="Seasonal count of influenza cases")
-
-data.1011 <- data %>%
-  filter(season=="2010-2011")
-hh.1011 <- data.1011 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-  
-data.1112 <- data %>%
-  filter(season=="2011-2012")
-hh.1112 <- data.1112 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-
-data.1213 <- data %>%
-  filter(season=="2012-2013")
-hh.1213 <- data.1213 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-
-data.1314 <- data %>%
-  filter(season=="2013-2014")
-hh.1314 <- data.1314 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-
-data.1415 <- data %>%
-  filter(season=="2014-2015")
-hh.1415 <- data.1415 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-
-data.1516 <- data %>%
-  filter(season=="2015-2016")
-hh.1516 <- data.1516 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-
-data.1617 <- data %>%
-  filter(season=="2016-2017")
-hh.1617 <- data.1617 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-table(hh.1617$nmem)
-
-data.1718 <- data %>%
-  filter(season=="2017-2018")
-hh.1718 <- data.1718 %>%
-  group_by(master_house_id) %>%
-  summarise(nmem = length(master_id), hh.flu.total = sum(flu.count, na.rm = T))
-table(hh.1718$nmem)
-```
 
 _Individual demographics_
 ```{r Table1}
